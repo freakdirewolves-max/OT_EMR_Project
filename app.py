@@ -35,25 +35,35 @@ with col_soap:
         st.success("Success! The SOAP Note has been saved to the database.")
 
 # --- RIGHT COLUMN: GOALS AND TARGETS ---
-with col_goals:
-    st.header("🎯 Target Goals")
-    st.write("Goal monitoring for today's session:")
+# --- LEFT COLUMN: SOAP NOTES ---
+with col_soap:
+    st.header("📝 Daily Session Note (SOAP)")
     
-    # Expandable form to add new goals
-    with st.expander("➕ Add New Goal"):
-        new_goal_desc = st.text_input("Goal Description", placeholder="e.g., Button 3 large buttons independently")
-        if st.button("Add Goal"):
-            if new_goal_desc:
-                functions.add_goal(patient_id, new_goal_desc)
-                st.success("New goal successfully added!")
-                st.rerun() # Refresh screen to update the goal list immediately
+    # Input fields for SOAP documentation
+    s_input = st.text_area("Subjective (S)", placeholder="Patient's/Parent's direct quotes or complaints (e.g., 'Masakit po kamay ko' or 'Hindi nakatulog kagabi')", height=80)
+    o_input = st.text_area("Objective (O)", placeholder="Measurable performance in activities, buttoning, fine motor tasks, behavior...", height=120)
+    a_input = st.text_area("Assessment (A)", placeholder="Clinical reasoning and analysis. Why was the performance such?", height=100)
+    p_input = st.text_area("Plan (P)", placeholder="Interventions and focus for the next session...", height=80)
     
-    # Fetch and display active goals from the database
-    active_goals = functions.get_active_goals(patient_id)
+    # Save button
+    if st.button("💾 Save SOAP Note", type="primary"):
+        functions.save_soap_note(patient_id, s_input, o_input, a_input, p_input)
+        st.success("Success! The SOAP Note has been saved to the database.")
+        st.rerun() # I-refresh para lumitaw agad ang bagong save sa history sa ibaba!
+
+    st.write("---")
+    st.subheader("📜 Past Session Notes History")
     
-    if not active_goals:
-        st.warning("No active goals found for this patient. Add a new goal above!")
+    # Kuhanin ang mga lumang notes ng bata
+    soap_history = functions.get_soap_history(patient_id)
+    
+    if not soap_history:
+        st.info("No previous records found for this patient. Start by adding a note above!")
     else:
-        for goal_id, description in active_goals:
-            # Checkbox interactive checklist for tracking
-            st.checkbox(f"**Goal #{goal_id}:** {description}", key=f"goal_{goal_id}")
+        for note_id, s, o, a, p, date_created in soap_history:
+            # Ipakita ang bawat session gamit ang dropdown boxes para malinis tingnan
+            with st.expander(f"📅 Session Note #{note_id} - {date_created}"):
+                st.markdown(f"**🗣️ Subjective (S):**\n{s if s else '*No entry*'}")
+                st.markdown(f"**🎯 Objective (O):**\n{o if o else '*No entry*'}")
+                st.markdown(f"**🧠 Assessment (A):**\n{a if a else '*No entry*'}")
+                st.markdown(f"**📋 Plan (P):**\n{p if p else '*No entry*'}")
