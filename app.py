@@ -1,69 +1,110 @@
 import streamlit as st
-import database
 import functions
 
-# App page configuration
-st.set_page_config(layout="wide") # Wide screen layout for split-screen view
+st.set_page_config(page_title="OT EMR System", layout="wide")
 
-st.title("🩺 Occupational Therapy - EMR System")
-st.write("---")
+st.title("Occupational Therapy EMR System")
 
-# 1. SIDEBAR: Patient Selection
-st.sidebar.header("👤 Patient Selection")
+# --- PATIENT SELECTION / INPUT ---
+st.sidebar.header("Patient Selection")
+patient_id = st.sidebar.number_input("Enter Patient ID:", min_value=1, value=1, step=1)
 
-# Temporary default Patient ID for demo purposes
-patient_id = 1 
-st.sidebar.write(f"**Current Patient ID:** {patient_id}")
-st.sidebar.info("Tip: You will be able to select the patient name from a drop-down in the next update!")
+st.header(f"Patient Record - ID #{patient_id}")
 
-# 2. SPLIT-SCREEN LAYOUT (2 Columns: Left and Right)
-col_soap, col_goals = st.columns([3, 2]) # 3:2 ratio allocates more space for SOAP notes
+# Layout: 2 Columns (Left: SOAP Notes & History, Right: Goals)
+col1, col2 = st.columns([0.6, 0.4])
 
 # --- LEFT COLUMN: SOAP NOTES ---
-with col_soap:
-    st.header("📝 Daily Session Note (SOAP)")
+with col1:
+    st.subheader("📝 New Session SOAP Note")
     
-    # Input fields for SOAP documentation
-    s_input = st.text_area("Subjective (S)", placeholder="Patient's/Parent's direct quotes or complaints (e.g., 'Masakit po kamay ko' or 'Hindi nakatulog kagabi')", height=80)
-    o_input = st.text_area("Objective (O)", placeholder="Measurable performance in activities, buttoning, fine motor tasks, behavior...", height=120)
-    a_input = st.text_area("Assessment (A)", placeholder="Clinical reasoning and analysis. Why was the performance such?", height=100)
-    p_input = st.text_area("Plan (P)", placeholder="Interventions and focus for the next session...", height=80)
-    
-    # Save button
-    if st.button("💾 Save SOAP Note", type="primary"):
-        functions.save_soap_note(patient_id, s_input, o_input, a_input, p_input)
-        st.success("Success! The SOAP Note has been saved to the database.")
-
-# --- RIGHT COLUMN: GOALS AND TARGETS ---
-# --- LEFT COLUMN: SOAP NOTES ---
-with col_soap:
-    st.header("📝 Daily Session Note (SOAP)")
-    
-    # Input fields for SOAP documentation
-    s_input = st.text_area("Subjective (S)", placeholder="Patient's/Parent's direct quotes or complaints (e.g., 'Masakit po kamay ko' or 'Hindi nakatulog kagabi')", height=80)
-    o_input = st.text_area("Objective (O)", placeholder="Measurable performance in activities, buttoning, fine motor tasks, behavior...", height=120)
-    a_input = st.text_area("Assessment (A)", placeholder="Clinical reasoning and analysis. Why was the performance such?", height=100)
-    p_input = st.text_area("Plan (P)", placeholder="Interventions and focus for the next session...", height=80)
-    
-    # Save button
-    if st.button("💾 Save SOAP Note", type="primary"):
-        functions.save_soap_note(patient_id, s_input, o_input, a_input, p_input)
-        st.success("Success! The SOAP Note has been saved to the database.")
-        st.rerun() # I-refresh para lumitaw agad ang bagong save sa history sa ibaba!
+    with st.form(key="soap_form", clear_on_submit=True):
+        subjective = st.text_area("Subjective (S)", placeholder="Patient's complaints, statements...")
+        objective = st.text_area("Objective (O)", placeholder="Clinical observations, measurements...")
+        assessment = st.text_area("Assessment (A)", placeholder="Progress analysis, clinical opinion...")
+        plan = st.text_area("Plan (P)", placeholder="Future treatment plan, next session goals...")
+        
+        submit_soap = st.form_submit_button("💾 Save SOAP Note", type="primary")
+        
+        if submit_soap:
+            if subjective or objective or assessment or plan:
+                functions.add_soap_note(patient_id, subjective, objective, assessment, plan)
+                st.success("SOAP Note saved successfully!")
+                st.rerun()
+            else:
+                st.warning("Please fill in at least one field before saving.")
 
     st.write("---")
-    st.subheader("📜 Past Session Notes History")
+    st.subheader("📅 Past Session Notes History")
     
-    # Kuhanin ang mga lumang notes ng bata
+    # Fetch previous notes
     soap_history = functions.get_soap_history(patient_id)
     
     if not soap_history:
         st.info("No previous records found for this patient. Start by adding a note above!")
     else:
-        for note_id, s, o, a, p, date_created in soap_history:
-            # Ipakita ang bawat session gamit ang dropdown boxes para malinis tingnan
-            with st.expander(f"📅 Session Note #{note_id} - {date_created}"):
+        for note_id, s, o, a, p, created_at in soap_history:
+            with st.expander(f"Session Note #{note_id} - {created_at}"):
+                # 1. View Mode
                 st.markdown(f"**🗣️ Subjective (S):**\n{s if s else '*No entry*'}")
                 st.markdown(f"**🎯 Objective (O):**\n{o if o else '*No entry*'}")
                 st.markdown(f"**🧠 Assessment (A):**\n{a if a else '*No entry*'}")
                 st.markdown(f"**📋 Plan (P):**\n{p if p else '*No entry*'}")
+                
+                st.write("---")
+                
+                # 2. Edit Section
+                with st.expander("✏️ Edit this Note"):
+                    with st.form(key=f"edit_form_{note_id}"):
+                        edit_s = st.text_area("Subjective (S)", value=s if s else "", key=f"es_{note_id}")
+                        edit_o = st.text_area("Objective (O)", value=o if o else "", key=f"eo_{note_id}")
+                        edit_a = st.text_area("Assessment (A)", value=a if a else "", key=f"ea_{note_id}")
+                        edit_p = st.text_area("Plan (P)", value=p if p else "", key=f"ep_{note_id}")
+                        
+                        save_edit = st.form_submit_button("💾 Save Changes", type="primary")
+                        if save_edit:
+                            functions.update_soap_note(note_id, edit_s, edit_o, edit_a, edit_p)
+                            st.success("Note updated successfully!")
+                            st.rerun()
+                
+                # 3. Delete Button
+                if st.button("🗑️ Delete Note", key=f"del_note_{note_id}"):
+                    functions.delete_soap_note(note_id)
+                    st.success("Note deleted!")
+                    st.rerun()
+
+# --- RIGHT COLUMN: GOALS AND TARGETS ---
+with col2:
+    st.subheader("🎯 Active Target Goals")
+    
+    # Add new goal form
+    with st.form(key="add_goal_form", clear_on_submit=True):
+        new_goal = st.text_input("Add New Goal:", placeholder="e.g., Improve fine motor coordination")
+        submit_goal = st.form_submit_button("➕ Add Goal")
+        
+        if submit_goal:
+            if new_goal.strip():
+                functions.add_goal(patient_id, new_goal)
+                st.success("Goal added!")
+                st.rerun()
+            else:
+                st.warning("Please type a goal description.")
+                
+    st.write("---")
+    
+    # Fetch active goals
+    active_goals = functions.get_active_goals(patient_id)
+    
+    if not active_goals:
+        st.info("No active goals yet. Add one above!")
+    else:
+        for goal_id, description in active_goals:
+            col_text, col_del = st.columns([0.85, 0.15])
+            
+            with col_text:
+                st.checkbox(f"**Goal #{goal_id}:** {description}", key=f"goal_{goal_id}")
+                
+            with col_del:
+                if st.button("🗑️", key=f"del_{goal_id}"):
+                    functions.delete_goal(goal_id)
+                    st.rerun()
